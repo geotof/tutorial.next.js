@@ -1,32 +1,11 @@
 'use server';
 
-import { signIn } from '@/auth';
-import { AuthError } from 'next-auth';
-
 import { z } from 'zod';
 import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { format } from 'path';
-
-export async function authenticate(
-  prevState: string | undefined,
-  formData: FormData
-) {
-  try {
-    await signIn('credentials', formData);
-  } catch (error) {
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case 'CredentialsSignin':
-          return 'Invalid credentials.';
-        default:
-          return 'Something went wrong.';
-      }
-    }
-    throw error;
-  }
-}
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
 
 const FormSchema = z.object({
   id: z.string(),
@@ -43,6 +22,7 @@ const FormSchema = z.object({
 });
 
 const CreateInvoice = FormSchema.omit({ id: true, date: true });
+const UpdateInvoice = FormSchema.omit({ date: true, id: true });
 
 export type State = {
   errors?: {
@@ -54,7 +34,7 @@ export type State = {
 };
 
 export async function createInvoice(prevState: State, formData: FormData) {
-  // Validate form using Zod
+  // Validate form fields using Zod
   const validatedFields = CreateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
@@ -91,8 +71,6 @@ export async function createInvoice(prevState: State, formData: FormData) {
   revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
 }
-
-const UpdateInvoice = FormSchema.omit({ id: true, date: true });
 
 export async function updateInvoice(
   id: string,
@@ -135,8 +113,27 @@ export async function deleteInvoice(id: string) {
   try {
     await sql`DELETE FROM invoices WHERE id = ${id}`;
     revalidatePath('/dashboard/invoices');
-    return { message: 'Deleted Invoice.' };
+    return { message: 'Deleted Invoice' };
   } catch (error) {
     return { message: 'Database Error: Failed to Delete Invoice.' };
+  }
+}
+
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData
+) {
+  try {
+    await signIn('credentials', formData);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Invalid credentials.';
+        default:
+          return 'Something went wrong.';
+      }
+    }
+    throw error;
   }
 }
